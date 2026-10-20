@@ -9,7 +9,6 @@
  */
 
 import router from './integration/llm-router.js';
-import ollama from './integration/ollama-client.js';
 
 window.kadastr = router;
 
@@ -19,7 +18,8 @@ window.kadastr = router;
 
 const state = {
   currentTab: 'chat',
-  chatHistory: JSON.parse(localStorage.getItem('kadastr.chat.history') || '[]'),
+  chatHistory: (localStorage.getItem('kadastr.settings') || '').includes('"saveHistory":true')
+    ? JSON.parse(localStorage.getItem('kadastr.chat.history') || '[]') : [],
   objectCard: JSON.parse(localStorage.getItem('kadastr.object.card') || '{}'),
   settings: JSON.parse(localStorage.getItem('kadastr.settings') || '{"provider":"auto"}'),
   isProcessing: false,
@@ -45,6 +45,11 @@ async function init() {
   bindSettings();
 
   // Инициализируем ИИ-роутер
+  router.onProgress = (r) => {
+    const p = document.getElementById('status-provider');
+    p.querySelector('.label').textContent = 'Загрузка модели ' + Math.round((r.progress || 0) * 100) + '%';
+    p.className = 'status-pill warn';
+  };
   await updateStatus();
   try {
     await router.init();
@@ -70,7 +75,7 @@ async function updateStatus() {
     const current = status.current;
     const providerLabel = {
       ollama: `Ollama · ${status.ollama.model || 'deepseek-r1'}`,
-      webllm: `WebLLM · ${status.webllm.model?.split('-').slice(0, 3).join('-') || 'модель'}`,
+      webllm: `WebLLM · ${status.webllm.note}`,
       null: 'ИИ недоступен',
     };
     providerEl.querySelector('.label').textContent = providerLabel[current] || 'проверка…';
@@ -232,7 +237,7 @@ async function askAI(question) {
       hint.style.marginTop = '8px';
       hint.style.fontSize = '12px';
       hint.style.color = 'var(--text-muted)';
-      hint.innerHTML = '💡 Откройте <strong>Настройки</strong> (⚙) для инструкций по установке Ollama.';
+      hint.innerHTML = '💡 Откройте <strong>Настройки</strong> (⚙) и загрузите модель. Нужен Chrome/Edge с WebGPU.';
       aiContent.appendChild(hint);
     }
   } finally {
@@ -279,7 +284,7 @@ function saveChat() {
   if (state.chatHistory.length > 30) {
     state.chatHistory = state.chatHistory.slice(-30);
   }
-  localStorage.setItem('kadastr.chat.history', JSON.stringify(state.chatHistory));
+  if (state.settings.saveHistory) localStorage.setItem('kadastr.chat.history', JSON.stringify(state.chatHistory));
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -393,7 +398,7 @@ async function handleTechplanFile(file) {
     document.getElementById('tp-status').textContent = 'ошибка';
     document.getElementById('tp-status').className = 'badge err';
     document.getElementById('tp-ai-output').textContent =
-      '⚠ ' + e.message + '\n\nУбедитесь, что Ollama запущена: ollama serve';
+      '⚠ ' + e.message;
   }
 }
 
@@ -642,90 +647,52 @@ async function searchDocs(query, docFilter) {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function bindSettings() {
-  const modal = document.getElementById('modal-settings');
-  document.getElementById('btn-settings').onclick = openSettings;
-  document.getElementById('btn-close-modal').onclick = closeSettings;
-  document.getElementById('btn-cancel-settings').onclick = closeSettings;
-  document.getElementById('btn-save-settings').onclick = saveSettings;
-  modal.onclick = (e) => {
-    if (e.target === modal) closeSettings();
+  const modal = document.getElementById("modal-settings");
+  document.getElementById("btn-settings").onclick = openSettings;
+  document.getElementById("btn-close-modal").onclick = closeSettings;
+  document.getElementById("btn-cancel-settings").onclick = closeSettings;
+  document.getElementById("btn-save-settings").onclick = saveSettings;
+  modal.onclick = (e) => { if (e.target === modal) closeSettings(); };
+  document.getElementById("btn-load-model").onclick = async () => {
+    router.setModel(document.getElementById("setting-model").value);
+    try { await router.ensureLoaded(); showToast("Модель загружена"); } catch (e) { alert(e.message); }
+    await updateStatus();
   };
-
-  document.getElementById('btn-refresh-models').onclick = refreshModels;
-  document.getElementById('btn-clear-kb').onclick = clearKB;
-  document.getElementById('btn-reload-kb').onclick = reloadKB;
+  document.getElementById("btn-delete-model").onclick = async () => {
+    if (!confirm("Удалить модель из кэша браузера? Для работы её придётся скачать заново.")) return;
+    await router.deleteModel(); showToast("Модель удалена"); await updateStatus();
+  };
+  document.getElementById("btn-wipe").onclick = () => {
+    if (!confirm("Стереть историю чата, карточку объекта и настройки на этом компьютере?")) return;
+    Object.keys(localStorage).filter((k) => k.startsWith("kadastr.")).forEach((k) => localStorage.removeItem(k));
+    location.reload();
+  };
+  document.getElementById("btn-clear-kb").onclick = clearKB;
+  document.getElementById("btn-reload-kb").onclick = reloadKB;
 }
 
 async function openSettings() {
-  const modal = document.getElementById('modal-settings');
-  modal.style.display = 'flex';
-
-  // Текущий провайдер
-  const current = await router.getStatus();
-  const provider = state.settings.provider || 'auto';
-  document.querySelector(`input[name="provider"][value="${provider}"]`).checked = true;
-
-  // URL Ollama
-  document.getElementById('setting-ollama-url').value = ollama.baseUrl;
-
-  // Модель
-  document.getElementById('setting-ollama-model').value = ollama.model;
-
-  // Список моделей
-  refreshModels();
-
-  // Статистика базы
-  const kbStats = document.getElementById('kb-stats');
-  if (current.kb.loaded) {
-    kbStats.textContent = `Документов: ${current.kb.documents}, фрагментов: ${current.kb.chunks}`;
-  } else {
-    kbStats.textContent = 'База не загружена';
-  }
+  document.getElementById("modal-settings").style.display = "flex";
+  const st = await router.getStatus();
+  document.getElementById("setting-model").value = router.model;
+  document.getElementById("setting-save-history").checked = !!state.settings.saveHistory;
+  document.getElementById("webgpu-note").textContent = st.webllm.webgpu
+    ? "✓ WebGPU доступен" : "⚠ WebGPU недоступен: нужен Chrome/Edge 113+ и подходящая видеокарта";
+  document.getElementById("kb-stats").textContent = st.kb.loaded
+    ? `Документов: ${st.kb.documents}, фрагментов: ${st.kb.chunks}`
+    : "База пуста: проверьте файлы data/fz-218.json, fz-221.json, p-0082.json";
 }
 
-function closeSettings() {
-  document.getElementById('modal-settings').style.display = 'none';
-}
+function closeSettings() { document.getElementById("modal-settings").style.display = "none"; }
 
 async function saveSettings() {
-  const provider = document.querySelector('input[name="provider"]:checked').value;
-  const url = document.getElementById('setting-ollama-url').value.trim();
-  const model = document.getElementById('setting-ollama-model').value;
-
-  state.settings = { provider };
-  localStorage.setItem('kadastr.settings', JSON.stringify(state.settings));
-
-  if (url) ollama.setUrl(url);
-  if (model) ollama.setModel(model);
-
-  // Принудительно переключить провайдера
-  if (provider === 'ollama' || provider === 'webllm') {
-    try {
-      await router.setProvider(provider);
-    } catch (e) {
-      alert('Не удалось переключить провайдер: ' + e.message);
-    }
-  } else if (provider === 'auto') {
-    // Сбросить автоопределение
-    localStorage.removeItem('kadastr.llm.provider');
-    await router.init();
-  }
-
+  router.setModel(document.getElementById("setting-model").value);
+  state.settings = { provider: "webllm", saveHistory: document.getElementById("setting-save-history").checked };
+  if (!state.settings.saveHistory) localStorage.removeItem("kadastr.chat.history");
+  localStorage.setItem("kadastr.settings", JSON.stringify(state.settings));
   closeSettings();
   await updateStatus();
-  showToast('Настройки сохранены');
-}
-
-async function refreshModels() {
-  const list = document.getElementById('setting-models-list');
-  list.innerHTML = '<span class="loading-text">загрузка списка</span>';
-  const models = await ollama.listModels();
-  if (models.length === 0) {
-    list.textContent = 'Ollama не запущена или моделей нет. Запустите: ollama serve';
-    return;
-  }
-  list.innerHTML = '<strong>Установленные модели:</strong><br>' +
-    models.map((m) => `• ${m.name} (${(m.size / 1e9).toFixed(1)} ГБ)`).join('<br>');
+  showToast("Настройки сохранены. Модель загрузится при следующем запросе.");
 }
 
 async function clearKB() {

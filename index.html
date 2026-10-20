@@ -247,51 +247,26 @@
       </div>
       <div class="modal-body">
         <div class="setting-group">
-          <h4>Провайдер ИИ</h4>
-          <div class="radio-group">
-            <label>
-              <input type="radio" name="provider" value="ollama">
-              <span class="radio-label">
-                <strong>Ollama</strong> (рекомендуется)
-                <small>Модель DeepSeek R1 на вашем компьютере. Лучшее качество.</small>
-              </span>
-            </label>
-            <label>
-              <input type="radio" name="provider" value="webllm">
-              <span class="radio-label">
-                <strong>WebLLM</strong> (фолбэк)
-                <small>Модель в браузере через WebGPU. Не требует установки.</small>
-              </span>
-            </label>
-            <label>
-              <input type="radio" name="provider" value="auto" checked>
-              <span class="radio-label">
-                <strong>Авто</strong>
-                <small>Сначала Ollama, при недоступности — WebLLM.</small>
-              </span>
-            </label>
-          </div>
-        </div>
-
-        <div class="setting-group">
-          <h4>Ollama URL</h4>
-          <input type="text" id="setting-ollama-url" placeholder="http://localhost:11434" class="setting-input">
-          <small class="hint">По умолчанию: http://localhost:11434. Для LAN можно указать IP сервера.</small>
-        </div>
-
-        <div class="setting-group">
-          <h4>Модель Ollama</h4>
-          <select id="setting-ollama-model" class="setting-input">
-            <option value="deepseek-r1:14b">deepseek-r1:14b (рекомендуется)</option>
-            <option value="deepseek-r1:7b">deepseek-r1:7b (для слабого железа)</option>
-            <option value="qwen2.5:7b-instruct">qwen2.5:7b-instruct</option>
-            <option value="qwen2.5:14b-instruct">qwen2.5:14b-instruct</option>
+          <h4>Модель (работает в браузере, на вашей видеокарте)</h4>
+          <select id="setting-model" class="setting-input">
+            <option value="Qwen2.5-3B-Instruct-q4f16_1-MLC">Qwen2.5 3B — быстрее, ~2,5 ГБ видеопамяти (слабые ПК)</option>
+            <option value="Qwen2.5-7B-Instruct-q4f16_1-MLC">Qwen2.5 7B — точнее, ~5 ГБ видеопамяти</option>
+            <option value="Qwen2.5-1.5B-Instruct-q4f16_1-MLC">Qwen2.5 1.5B — самый лёгкий, качество низкое</option>
           </select>
-          <button class="btn-secondary" id="btn-refresh-models">Обновить список</button>
-          <div id="setting-models-list" class="models-list"></div>
+          <small class="hint" id="webgpu-note"></small>
+          <button class="btn-secondary" id="btn-load-model">Загрузить модель</button>
+          <button class="btn-secondary danger" id="btn-delete-model">Удалить модель из кэша</button>
+          <small class="hint">Первая загрузка — несколько ГБ из интернета, затем модель хранится в браузере и работает без сети.</small>
         </div>
 
         <div class="setting-group">
+          <h4>Конфиденциальность</h4>
+          <label><input type="checkbox" id="setting-save-history"> Сохранять историю чата на этом компьютере</label>
+          <button class="btn-secondary danger" id="btn-wipe">Стереть все данные приложения</button>
+        </div>
+
+        
+<div class="setting-group">
           <h4>База знаний</h4>
           <div class="kb-stats" id="kb-stats"></div>
           <button class="btn-secondary danger" id="btn-clear-kb">Очистить базу</button>
@@ -301,9 +276,8 @@
         <div class="setting-group">
           <h4>О проекте</h4>
           <p class="about-text">
-            Кадастр.Помощник KB-100 — полностью офлайн ИИ-ассистент для кадастровых инженеров.
-            Модель DeepSeek R1 работает на вашей машине, данные не покидают компьютер.
-            Соответствует 152-ФЗ «О персональных данных». Версия 1.0.
+            Кадастр.Помощник KB-100. Модель работает в браузере на вашем компьютере, тексты запросов и файлы не отправляются на серверы.
+            Ответы ИИ могут быть неточными — сверяйте с первоисточником.
           </p>
         </div>
       </div>
@@ -321,7 +295,7 @@
         KB-100 · Кадастр.Помощник v1.0 · Октябрь 2026
       </div>
       <div class="footer-right">
-        Данные не покидают ваше устройство · Соответствие 152-ФЗ
+        Запросы обрабатываются на этом устройстве
       </div>
     </div>
   </footer>
