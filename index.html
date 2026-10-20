@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Кадастр.Помощник KB-100 — офлайн ИИ-ассистент для кадастровых инженеров. Проверка техпланов, консультации по ФЗ-218 и П/0082, формирование замечаний.">
+  <title>Кадастр.Помощник KB-100 — локальный ИИ-ассистент</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23564d32'/%3E%3Ctext x='50' y='65' font-size='48' font-weight='bold' text-anchor='middle' fill='%238c7226' font-family='sans-serif'%3EKB%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <!-- ─────── Header ─────── -->
+  <header class="app-header">
+    <div class="container">
+      <div class="brand">
+        <div class="logo">KB-100</div>
+        <div class="brand-text">
+          <h1>Кадастр.Помощник</h1>
+          <span class="tagline">Локальный ИИ-ассистент кадастрового инженера</span>
+        </div>
+      </div>
+      <div class="status-bar" id="status-bar">
+        <div class="status-pill" id="status-provider">
+          <span class="dot"></span>
+          <span class="label">проверка…</span>
+        </div>
+        <div class="status-pill" id="status-kb">
+          <span class="dot"></span>
+          <span class="label">база…</span>
+        </div>
+        <button class="btn-icon" id="btn-settings" title="Настройки">⚙</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ─────── Tabs ─────── -->
+  <nav class="tabs">
+    <div class="container">
+      <button class="tab active" data-tab="chat">
+        <span class="tab-icon">💬</span>
+        <span class="tab-label">ИИ-помощник</span>
+      </button>
+      <button class="tab" data-tab="techplan">
+        <span class="tab-icon">📋</span>
+        <span class="tab-label">Проверка техплана</span>
+      </button>
+      <button class="tab" data-tab="object">
+        <span class="tab-icon">🏠</span>
+        <span class="tab-label">Карточка объекта</span>
+      </button>
+      <button class="tab" data-tab="docs">
+        <span class="tab-icon">📚</span>
+        <span class="tab-label">Нормативная база</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ─────── Main ─────── -->
+  <main class="container main-content">
+
+    <!-- ── Tab: Chat ─────────────────────────────────── -->
+    <section class="tab-panel active" id="panel-chat">
+      <div class="panel-header">
+        <h2>ИИ-помощник</h2>
+        <p class="panel-subtitle">Консультирует по ФЗ-218, ФЗ-221, приказу П/0082. Все данные остаются на вашем компьютере.</p>
+      </div>
+
+      <div class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+          <div class="message message-ai">
+            <div class="message-avatar">КБ</div>
+            <div class="message-content">
+              <div class="message-text">Здравствуйте! Я — ваш кадастровый ассистент. Помогу с вопросами по ФЗ-218, ФЗ-221, приказу П/0082. Спросите меня о составе документов, требованиях к техплану или порядке кадастрового учёта.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="chat-presets" id="chat-presets">
+          <button class="preset-btn" data-q="Какие документы нужны для кадастрового учёта нового здания?">Документы для здания</button>
+          <button class="preset-btn" data-q="Что делать, если в техплане обнаружена ошибка после подачи в Росреестр?">Ошибка в техплане</button>
+          <button class="preset-btn" data-q="Какой срок государственной регистрации прав?">Срок регистрации</button>
+          <button class="preset-btn" data-q="Какие требования к составу технического плана?">Состав техплана</button>
+        </div>
+
+        <div class="chat-input">
+          <textarea id="chat-input-field" placeholder="Введите вопрос…" rows="2"></textarea>
+          <button class="btn-primary" id="btn-send">Отправить</button>
+        </div>
+
+        <div class="chat-meta" id="chat-meta"></div>
+      </div>
+    </section>
+
+    <!-- ── Tab: TechPlan ─────────────────────────────── -->
+    <section class="tab-panel" id="panel-techplan">
+      <div class="panel-header">
+        <h2>Проверка техплана</h2>
+        <p class="panel-subtitle">Загрузите XML технического плана для автоматической проверки по приказу П/0082.</p>
+      </div>
+
+      <div class="techplan-layout">
+        <div class="upload-zone" id="upload-zone">
+          <input type="file" id="file-xml" accept=".xml" hidden>
+          <div class="upload-icon">📄</div>
+          <h3>Перетащите XML техплана сюда</h3>
+          <p>или нажмите для выбора файла</p>
+          <button class="btn-secondary" id="btn-select-file">Выбрать файл</button>
+        </div>
+
+        <div class="techplan-results" id="techplan-results" style="display:none;">
+          <div class="results-header">
+            <h3 id="tp-filename">—</h3>
+            <div class="results-meta">
+              <span class="badge" id="tp-status">анализ…</span>
+              <span class="badge muted" id="tp-provider"></span>
+            </div>
+          </div>
+
+          <div class="results-section">
+            <h4>📋 Структурная проверка</h4>
+            <div id="tp-structural" class="structural-grid"></div>
+          </div>
+
+          <div class="results-section">
+            <h4>⚠ Замечания по П/0082</h4>
+            <div id="tp-remarks" class="remarks-list"></div>
+          </div>
+
+          <div class="results-section">
+            <h4>ИИ-анализ</h4>
+            <div id="tp-ai-output" class="ai-output"></div>
+          </div>
+
+          <div class="results-section" id="tp-citations-section" style="display:none;">
+            <h4>📚 Источники</h4>
+            <div id="tp-citations" class="citations-list"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tab: Object Card ──────────────────────────── -->
+    <section class="tab-panel" id="panel-object">
+      <div class="panel-header">
+        <h2>Карточка объекта</h2>
+        <p class="panel-subtitle">Соберите сведения об объекте недвижимости. Данные сохраняются локально в браузере.</p>
+      </div>
+
+      <div class="object-form">
+        <div class="form-grid">
+          <div class="form-field">
+            <label>Кадастровый номер</label>
+            <input type="text" id="obj-cadastral" placeholder="77:01:0001001:123" data-field="cadastralNumber">
+            <span class="field-hint" id="cn-hint"></span>
+          </div>
+
+          <div class="form-field">
+            <label>Тип объекта</label>
+            <select id="obj-type" data-field="objectType">
+              <option value="">— выберите —</option>
+              <option value="land_plot">Земельный участок</option>
+              <option value="building">Здание</option>
+              <option value="premise">Помещение</option>
+              <option value="construction">Сооружение</option>
+              <option value="unfinished">Объект незавершённого строительства</option>
+            </select>
+          </div>
+
+          <div class="form-field">
+            <label>Назначение / вид разрешённого использования</label>
+            <input type="text" id="obj-purpose" placeholder="например, жилое" data-field="purpose">
+          </div>
+
+          <div class="form-field">
+            <label>Площадь, кв. м</label>
+            <input type="number" id="obj-area" placeholder="120.5" step="0.1" data-field="area">
+          </div>
+
+          <div class="form-field">
+            <label>Адрес</label>
+            <input type="text" id="obj-address" placeholder="г. Москва, ул.…" data-field="address">
+          </div>
+
+          <div class="form-field">
+            <label>Этажность (для ОКС)</label>
+            <input type="number" id="obj-floors" placeholder="5" data-field="floors">
+          </div>
+
+          <div class="form-field full-width">
+            <label>Дополнительные сведения / открытые вопросы</label>
+            <textarea id="obj-notes" rows="3" placeholder="Особые условия, обременения, история объекта…" data-field="notes"></textarea>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button class="btn-secondary" id="btn-checklist">Сформировать чек-лист документов</button>
+          <button class="btn-secondary" id="btn-save">Сохранить в локальное хранилище</button>
+          <button class="btn-secondary" id="btn-export">Экспорт карточки (JSON)</button>
+          <button class="btn-secondary danger" id="btn-clear">Очистить</button>
+        </div>
+
+        <div class="checklist-result" id="checklist-result" style="display:none;">
+          <h4>Чек-лист документов</h4>
+          <div id="checklist-content"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Tab: Docs ─────────────────────────────────── -->
+    <section class="tab-panel" id="panel-docs">
+      <div class="panel-header">
+        <h2>Нормативная база</h2>
+        <p class="panel-subtitle">Локальная база ключевых документов кадастровой деятельности. Поиск доступен офлайн.</p>
+      </div>
+
+      <div class="docs-search">
+        <input type="text" id="docs-search-input" placeholder="Поиск по нормативке (например, «состав техплана»)">
+        <select id="docs-filter">
+          <option value="all">Все документы</option>
+          <option value="fz-218">ФЗ-218</option>
+          <option value="fz-221">ФЗ-221</option>
+          <option value="p-0082">П/0082</option>
+        </select>
+        <button class="btn-primary" id="btn-search-docs">Найти</button>
+      </div>
+
+      <div class="docs-list" id="docs-results"></div>
+
+      <div class="docs-external">
+        <h3>Внешние ресурсы</h3>
+        <ul class="external-links">
+          <li><a href="http://pravo.gov.ru" target="_blank" rel="noopener">Официальный портал правовой информации</a></li>
+          <li><a href="https://rosreestr.gov.ru" target="_blank" rel="noopener">Росреестр</a></li>
+          <li><a href="https://lk.rosreestr.ru" target="_blank" rel="noopener">Личный кабинет правообладателя</a></li>
+        </ul>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ─────── Settings Modal ─────── -->
+  <div class="modal-overlay" id="modal-settings" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Настройки ИИ</h3>
+        <button class="btn-icon" id="btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-group">
+          <h4>Провайдер ИИ</h4>
+          <div class="radio-group">
+            <label>
+              <input type="radio" name="provider" value="ollama">
+              <span class="radio-label">
+                <strong>Ollama</strong> (рекомендуется)
+                <small>Модель DeepSeek R1 на вашем компьютере. Лучшее качество.</small>
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="provider" value="webllm">
+              <span class="radio-label">
+                <strong>WebLLM</strong> (фолбэк)
+                <small>Модель в браузере через WebGPU. Не требует установки.</small>
+              </span>
+            </label>
+            <label>
+              <input type="radio" name="provider" value="auto" checked>
+              <span class="radio-label">
+                <strong>Авто</strong>
+                <small>Сначала Ollama, при недоступности — WebLLM.</small>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <div class="setting-group">
+          <h4>Ollama URL</h4>
+          <input type="text" id="setting-ollama-url" placeholder="http://localhost:11434" class="setting-input">
+          <small class="hint">По умолчанию: http://localhost:11434. Для LAN можно указать IP сервера.</small>
+        </div>
+
+        <div class="setting-group">
+          <h4>Модель Ollama</h4>
+          <select id="setting-ollama-model" class="setting-input">
+            <option value="deepseek-r1:14b">deepseek-r1:14b (рекомендуется)</option>
+            <option value="deepseek-r1:7b">deepseek-r1:7b (для слабого железа)</option>
+            <option value="qwen2.5:7b-instruct">qwen2.5:7b-instruct</option>
+            <option value="qwen2.5:14b-instruct">qwen2.5:14b-instruct</option>
+          </select>
+          <button class="btn-secondary" id="btn-refresh-models">Обновить список</button>
+          <div id="setting-models-list" class="models-list"></div>
+        </div>
+
+        <div class="setting-group">
+          <h4>База знаний</h4>
+          <div class="kb-stats" id="kb-stats"></div>
+          <button class="btn-secondary danger" id="btn-clear-kb">Очистить базу</button>
+          <button class="btn-secondary" id="btn-reload-kb">Перезагрузить</button>
+        </div>
+
+        <div class="setting-group">
+          <h4>О проекте</h4>
+          <p class="about-text">
+            Кадастр.Помощник KB-100 — полностью офлайн ИИ-ассистент для кадастровых инженеров.
+            Модель DeepSeek R1 работает на вашей машине, данные не покидают компьютер.
+            Соответствует 152-ФЗ «О персональных данных». Версия 1.0.
+          </p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-secondary" id="btn-cancel-settings">Отмена</button>
+        <button class="btn-primary" id="btn-save-settings">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─────── Footer ─────── -->
+  <footer class="app-footer">
+    <div class="container">
+      <div class="footer-left">
+        KB-100 · Кадастр.Помощник v1.0 · Октябрь 2026
+      </div>
+      <div class="footer-right">
+        Данные не покидают ваше устройство · Соответствие 152-ФЗ
+      </div>
+    </div>
+  </footer>
+
+  <!-- ─────── Scripts ─────── -->
+  <script type="module" src="app.js"></script>
+</body>
+</html>
